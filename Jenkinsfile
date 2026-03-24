@@ -1,80 +1,46 @@
 pipeline {
     agent any
-
+    
     environment {
-        AWS_REGION = "ap-south-1"
-        ECR_REGISTRY = "343770680577.dkr.ecr.ap-south-1.amazonaws.com"
-        ECR_REPOSITORY = "devops-pipline"
-        IMAGE_TAG = "latest"
-        INSTANCE_ID = "i-0c484beecadd7540d"   // 🔥 replace with your EC2 ID
+        AWS_REGION = 'ap-south-1'
+        ECR_REPO = '343770680577.dkr.ecr.ap-south-1.amazonaws.com/devops-pipline'
     }
-
+    
     stages {
-
-        stage('Build Docker Image') {
+        stage('Checkout') {
             steps {
-                sh 'docker build -t devops-pipeline .'
+                git branch: 'main', url: 'https://github.com/your-username/your-repo.git'
             }
         }
-
-        stage('Tag Image') {
+        
+        stage('Build Docker Image') {
             steps {
                 sh '''
-                docker tag devops-pipeline:latest $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+                    docker build -t ${ECR_REPO}:latest .
                 '''
             }
         }
-
-        stage('Login to ECR') {
-            steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-creds'
-                ]]) {
-                    sh '''
-                    aws ecr get-login-password --region $AWS_REGION | \
-                    docker login --username AWS --password-stdin $ECR_REGISTRY
-                    '''
-                }
-            }
-        }
-
+        
         stage('Push to ECR') {
             steps {
                 sh '''
-                docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+                    aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REPO}
+                    docker push ${ECR_REPO}:latest
                 '''
             }
         }
-
-        stage('Deploy via SSM') {
+        
+        stage('Deploy to EC2') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-creds'
-                ]]) {
-                    sh '''
-                    aws ssm send-command \
-                    --instance-ids $INSTANCE_ID \
-                    --document-name "AWS-RunShellScript" \
-                    --comment "Deploy Docker Container" \
-                    --parameters commands="
-                    
-                    aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
-                    
-                   docker rm -f my-app || true
-                    
-                    docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-                    
-                    docker run -d -p 8080:8080 --name my-app $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-                    
-                    docker ps
-                    " \
-                    --region $AWS_REGION
-                      
-                    
-                    '''
-                }
+                sh '''
+                    ssh -i UBUNTU-KEY.pem ubuntu@ec2-13-233-155-255.ap-south-1.compute.amazonaws.com << 'EOF'
+                        aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 343770680577.dkr.ecr.ap-south-1.amazonaws.com
+                        docker rm -f my-app || true
+                        docker pull 343770680577.dkr.ecr.ap-south-1.amazonaws.com/devops-pipline:latest
+                        docker run -d -p 8080:8080 --name my-app 343770680577.dkr.ecr.ap-south-1.amazonaws.com/devops-pipline:latest
+                        docker ps
+                    EOF
+                '''
             }
         }
     }
