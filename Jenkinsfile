@@ -7,6 +7,13 @@ pipeline {
     }
     
     stages {
+
+
+stage('Build App') {
+    steps {
+        sh 'mvn clean package'
+    }
+}
         
         stage('Build Docker Image') {
             steps {
