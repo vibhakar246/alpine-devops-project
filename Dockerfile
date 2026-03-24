@@ -1,10 +1,7 @@
-FROM node:18-alpine
+FROM openjdk:17-jdk-slim
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install
-
-COPY . .
+COPY target/*.jar app.jar
 
 EXPOSE 8080
-CMD ["npm", "start"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
