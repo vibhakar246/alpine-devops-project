@@ -9,7 +9,17 @@ pipeline {
         INSTANCE_ID = "i-0c484beecadd7540d"
     }
 
+<<<<<<< HEAD
     
+=======
+    stages {
+
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'git@github.com:vibhakar246/alpine-devops-project.git'
+            }
+        }
+>>>>>>> fe54ce8 (Clean Java DevOps project)
 
         stage('Build JAR') {
             steps {
