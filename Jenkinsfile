@@ -62,8 +62,16 @@ pipeline {
                     
                     aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
                     
-
-                      touch /home/ubuntu/vibhakar.txt
+                   docker rm -f my-app || true
+                    
+                    docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+                    
+                    docker run -d -p 8080:8080 --name my-app $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+                    
+                    docker ps
+                    " \
+                    --region $AWS_REGION
+                      
                     
                     '''
                 }
