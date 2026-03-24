@@ -2,37 +2,70 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "alpine-devops-app"
-        TAG = "latest"
+        AWS_REGION = "ap-south-1"
+        ECR_REGISTRY = "343770680577.dkr.ecr.ap-south-1.amazonaws.com"
+        ECR_REPOSITORY = "devops-pipline"
+        IMAGE_TAG = "latest"
+        EC2_HOST = "13.233.155.255"
     }
 
     stages {
 
-        stage('Clone Repo') {
-            steps {
-                echo "Cloning repository..."
-                git 'https://github.com/your-username/your-repo.git'
-            }
-        }
-
         stage('Build Docker Image') {
             steps {
                 echo "Building Docker image..."
-                sh "docker build -t $IMAGE_NAME:$TAG ."
+                sh 'docker build -t devops-pipeline .'
             }
         }
 
-        stage('Run Container') {
+        stage('Tag Image') {
             steps {
-                echo "Running container..."
-                sh "docker run -d --name alpine-container $IMAGE_NAME:$TAG"
+                sh '''
+                docker tag devops-pipeline:latest $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+                '''
             }
         }
 
-        stage('Clean Up') {
+        stage('Login to ECR') {
             steps {
-                echo "Cleaning old container..."
-                sh "docker rm -f alpine-container || true"
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-creds'
+                ]]) {
+                    sh '''
+                    aws ecr get-login-password --region $AWS_REGION | \
+                    docker login --username AWS --password-stdin $ECR_REGISTRY
+                    '''
+                }
+            }
+        }
+
+        stage('Push to ECR') {
+            steps {
+                sh '''
+                docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+                '''
+            }
+        }
+
+        stage('Deploy to EC2') {
+            steps {
+                sshagent(['ec2-ssh-key']) {
+                    sh '''
+                    ssh -o StrictHostKeyChecking=no ubuntu@$EC2_HOST "
+
+                    aws ecr get-login-password --region $AWS_REGION | \
+                    docker login --username AWS --password-stdin $ECR_REGISTRY &&
+
+                    docker rm -f my-app || true &&
+
+                    docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG &&
+
+                    docker run -d -p 8080:8080 --name my-app \
+                    $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+                    "
+                    '''
+                }
             }
         }
     }
