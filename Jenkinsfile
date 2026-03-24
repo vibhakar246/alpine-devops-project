@@ -6,21 +6,19 @@ pipeline {
         ECR_REGISTRY = "343770680577.dkr.ecr.ap-south-1.amazonaws.com"
         ECR_REPOSITORY = "devops-pipline"
         IMAGE_TAG = "latest"
-        EC2_HOST = "13.233.155.255"
+        INSTANCE_ID = "i-xxxxxxxxxxxx"   // 🔥 replace with your EC2 ID
     }
 
     stages {
 
         stage('Build Docker Image') {
             steps {
-                echo "🚀 Building Docker image..."
                 sh 'docker build -t devops-pipeline .'
             }
         }
 
         stage('Tag Image') {
             steps {
-                echo "🏷️ Tagging Docker image..."
                 sh '''
                 docker tag devops-pipeline:latest $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
                 '''
@@ -29,7 +27,6 @@ pipeline {
 
         stage('Login to ECR') {
             steps {
-                echo "🔐 Logging into AWS ECR..."
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-creds'
@@ -44,42 +41,36 @@ pipeline {
 
         stage('Push to ECR') {
             steps {
-                echo "📤 Pushing image to ECR..."
                 sh '''
                 docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
                 '''
             }
         }
 
-        stage('Deploy to EC2') {
+        stage('Deploy via SSM') {
             steps {
-                echo "🚀 Deploying to EC2..."
-                sshagent(['ec2-ssh-key']) {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-creds'
+                ]]) {
                     sh '''
-                    ssh -tt -o StrictHostKeyChecking=no ubuntu@$EC2_HOST << EOF
-
-                    set -e
-
-                    echo "✅ Connected to EC2"
-
-                    aws ecr get-login-password --region $AWS_REGION | \
-                    docker login --username AWS --password-stdin $ECR_REGISTRY
-
-                    echo "🧹 Removing old container..."
+                    aws ssm send-command \
+                    --instance-ids $INSTANCE_ID \
+                    --document-name "AWS-RunShellScript" \
+                    --comment "Deploy Docker Container" \
+                    --parameters commands="
+                    
+                    aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+                    
                     docker rm -f my-app || true
-
-                    echo "⬇️ Pulling latest image..."
+                    
                     docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-                    echo "🚀 Starting container..."
-                    docker run -d -p 8080:8080 --name my-app \
-                    $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-                    echo "📦 Running containers:"
+                    
+                    docker run -d -p 8080:8080 --name my-app $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+                    
                     docker ps
-
-                    exit
-                    EOF
+                    " \
+                    --region $AWS_REGION
                     '''
                 }
             }
