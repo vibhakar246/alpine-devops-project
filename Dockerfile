@@ -1,9 +1,19 @@
-FROM alpine:latest
+# Dockerfile
+FROM node:18-alpine
 
 WORKDIR /app
 
-COPY app.sh .
+# Copy package files
+COPY package*.json ./
 
-RUN chmod +x app.sh
+# Install dependencies
+RUN npm ci --only=production
 
-CMD ["./app.sh"]
+# Copy application code
+COPY . .
+
+# Expose port
+EXPOSE 8080
+
+# Start the application
+CMD ["npm", "start"]
