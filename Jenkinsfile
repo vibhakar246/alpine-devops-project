@@ -6,7 +6,7 @@ pipeline {
         ECR_REGISTRY = "343770680577.dkr.ecr.ap-south-1.amazonaws.com"
         ECR_REPOSITORY = "devops-pipline"
         IMAGE_TAG = "latest"
-        INSTANCE_ID = "i-xxxxxxxxxxxx"   // 🔥 replace with your EC2 ID
+        INSTANCE_ID = "i-0c484beecadd7540d"   // 🔥 replace with your EC2 ID
     }
 
     stages {
