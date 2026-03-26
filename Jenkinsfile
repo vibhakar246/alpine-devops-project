@@ -36,13 +36,15 @@ pipeline {
         }
 
         stage('Deploy to EC2') {
-    steps {
-        sh '''
-        docker pull ${ECR_REPO}:latest
-        docker run -d -p 8083:8080 --name chatbot-app-${BUILD_NUMBER} ${ECR_REPO}:latest
-        '''
+            steps {
+                sh '''
+                docker pull ${ECR_REPO}:latest
+                docker run -d -p 8083:8080 --name chatbot-app-${BUILD_NUMBER} ${ECR_REPO}:latest
+                '''
+            }
+        }
     }
-}
+}}
                 '''
             }
         }
